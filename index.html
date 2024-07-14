@@ -1,136 +1,282 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="en">
 <head>
-    <meta name="viewport" content="width=device-width,initial-scale=1.0">
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat Privado</title>
+  <!-- Estilos CSS para Emoji Mart desde un CDN -->
+  <link rel="stylesheet" href="https://unpkg.com/emoji-mart@5.3.2/css/emoji-mart.css" />
 
-    <title>Socket.IO chat</title>
-    <style>
-        body {
-            margin: 0;
-            padding-bottom: 3rem;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        }
+  <!-- Estilos CSS para tu aplicación de chat -->
+  <style>
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      background-color: #f0f0f0;
+      margin: 0;
+      padding: 20px;
+    }
 
-        #form {
-            background: rgba(0, 0, 0, 0.15);
-            padding: 0.25rem;
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            display: flex;
-            height: 3rem;
-            box-sizing: border-box;
-            backdrop-filter: blur(10px);
-        }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background-color: #fff;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      padding: 20px;
+    }
 
-        #input {
-            border: none;
-            padding: 0 1rem;
-            flex-grow: 1;
-            border-radius: 2rem;
-            margin: 0.25rem;
-        }
+    #messages {
+      max-height: 600px;
+      overflow-y: auto;
+      padding-right: 20px;
+    }
 
-        #input:focus {
-            outline: none;
-        }
+    .message {
+      background-color: #f0f0f0;
+      padding: 8px;
+      margin-bottom: 10px;
+      border-radius: 5px;
+      min-width: 100px;
+      max-width: 70%;
+      display: inline-block;
+      clear: both;
+      position: relative;
+      word-break: break-word;
+      overflow: hidden;
+      padding-right: 40px;
+    }
 
-        #form>button {
-            background: #333;
-            border: none;
-            padding: 0 1rem;
-            margin: 0.25rem;
-            border-radius: 3px;
-            outline: none;
-            color: #fff;
-        }
+    .message .content {
+      text-align: left;
+      display: block;
+      position: relative;
+      padding-right: 20px;
+    }
 
-        #messages {
-            list-style-type: none;
-            padding: 0;
-            margin: 0;
-        }
+    .message .time {
+      color: #666;
+      font-size: 12px;
+      position: absolute;
+      bottom: 5px;
+      right: 10px;
+    }
 
-        li {
-            margin-bottom: 10px;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 10px;
-            max-width: 30%;
-            /* Para asegurar que el mensaje no ocupe más del 80% del contenedor */
-        }
-    </style>
+    .message-group {
+      margin-top: 20px;
+      border-top: 1px solid #ccc;
+      padding-top: 10px;
+    }
+
+    .message-group .date-divider {
+      text-align: center;
+      margin-bottom: 10px;
+      font-size: 14px;
+      color: #999;
+    }
+
+    #chatForm {
+      display: flex;
+      margin-top: 20px;
+    }
+
+    #messageInput {
+      flex: 1;
+      padding: 10px;
+      font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      margin-right: 10px;
+      overflow: auto;
+    }
+
+    #emojiButton {
+      padding: 10px;
+      font-size: 16px;
+      background-color: #007bff;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-right: 10px;
+    }
+
+    #emojiButton:hover {
+      background-color: #0056b3;
+    }
+
+    #chatForm button[type="submit"] {
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: #007bff;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    #chatForm button[type="submit"]:hover {
+      background-color: #0056b3;
+    }
+
+    #emojiPicker {
+      display: none;
+      position: absolute;
+      bottom: 50px;
+      right: 20px;
+    }
+  </style>
 </head>
-<script src="/socket.io/socket.io.js"></script>
-<script>
-    // Espera a que el DOM esté completamente cargado
-    document.addEventListener("DOMContentLoaded", function () {
-        // Creamos una instancia de socket.io para manejar la comunicación en tiempo real
-        const socket = io();
-        // Obtenemos referencias a los elementos del DOM
-        const form = document.getElementById('form');
-        const input = document.getElementById('input');
-        const messages = document.getElementById('messages');
-
-        // Variable para almacenar el ID del usuario
-        var userId;
-
-
-        // Escucha el evento 'user connected' emitido por el servidor cuando un usuario se conecta por primera vez
-        socket.on('user connected', (data) => {
-            const userID = data.userID;
-            userId = userID;
-            console.log(userId);
-
-        });
-
-        // Escucha el evento de envío del formulario (cuando el usuario envía un mensaje)
-
-        form.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const mensaje = input.value;
-            if (input.value) {
-                // Enviar el mensaje y el userID al servidor
-                socket.emit('chat message', { userID: userId, mensaje });
-                input.value = '';
-            }
-        });
-
-        // Escucha el evento 'chat message' emitido por el servidor cuando recibe un mensaje
-        socket.on('chat message', (data) => {
-            const item = document.createElement('li');
-            item.textContent = data.msg;
-            // Cambiar la propiedad float según el usuario
-            if (data.userID === userId) {
-                item.style.backgroundColor = '#ccffcc';
-                item.style.float = 'left';
-                item.style.clear = 'both';
-            } else {
-                item.style.backgroundColor = 'white';
-                item.style.float = 'right';
-                item.style.clear = 'both';
-            }
-
-            messages.appendChild(item);
-            window.scrollTo(0, document.body.scrollHeight);
-        });
-
-    });
-
-</script>
-
 <body>
-    <div class="container-fluid">
-        <ul id="messages"></ul>
-        <form id="form" action="">
-            <input id="input" autocomplete="off" /><button type="submit">Enviar</button>
-        </form>
-
+  <div class="container">
+    <div id="messages">
+      <!-- Aquí se mostrarán los mensajes recibidos -->
     </div>
 
-</body>
+    <form id="chatForm" action="">
+      <input type="text" id="messageInput" placeholder="Escribe tu mensaje..." required>
+      <button type="button" id="emojiButton">😀</button>
+      <button type="submit">Enviar</button>
+    </form>
 
+    <div id="emojiPicker"></div> <!-- Contenedor para la planilla de emojis -->
+  </div>
+
+  <!-- Scripts -->
+  <script src="/socket.io/socket.io.js"></script>
+  <!-- Script para Emoji Mart desde un CDN -->
+  <script src="https://unpkg.com/emoji-mart@5.3.2/dist/emoji-mart.min.js"></script>
+
+  <!-- Script personalizado para el chat -->
+  <script>
+    const socket = io();
+
+    document.addEventListener('DOMContentLoaded', function() {
+      scrollMessagesToBottom();
+    });
+
+    socket.on('chat message', function(content, id, sender_user, date_sent, userConnected) {
+      const messageElement = createMessageElement(content, id, sender_user, date_sent, userConnected);
+      appendMessageToContainer(messageElement);
+      scrollMessagesToBottom();
+    });
+
+    function createMessageElement(content, id, sender_user, date_sent, userConnected) {
+      const messageElement = document.createElement('div');
+      messageElement.classList.add('message');
+      messageElement.innerHTML = `
+        <span class="content">${content}</span>
+        <span class="time">${formatDate(date_sent)}</span>
+      `;
+      messageElement.setAttribute('data-date', date_sent);
+      if(sender_user == userConnected) {
+        messageElement.style.backgroundColor = '#ccffcc';
+        messageElement.style.float = 'right';
+      } else {
+        messageElement.style.backgroundColor = 'grey';
+        messageElement.style.float = 'left';
+      }
+      return messageElement;
+    }
+
+    function appendMessageToContainer(messageElement) {
+      const messagesContainer = document.getElementById('messages');
+      const messageDate = new Date(messageElement.getAttribute('data-date'));
+      const currentDate = new Date();
+      const lastMessageGroup = messagesContainer.lastElementChild;
+
+      if (lastMessageGroup && lastMessageGroup.classList.contains('message-group')) {
+        const lastMessageDate = new Date(lastMessageGroup.getAttribute('data-group-date'));
+        if (isSameDay(lastMessageDate, messageDate)) {
+          lastMessageGroup.appendChild(messageElement);
+        } else {
+          createMessageGroup(messageElement);
+        }
+      } else {
+        createMessageGroup(messageElement);
+      }
+    }
+
+    function createMessageGroup(messageElement) {
+      const messageGroup = document.createElement('div');
+      messageGroup.classList.add('message-group');
+      messageGroup.setAttribute('data-group-date', messageElement.getAttribute('data-date'));
+      const dateDivider = document.createElement('div');
+      dateDivider.classList.add('date-divider');
+      dateDivider.textContent = formatGroupDate(new Date(messageElement.getAttribute('data-date')));
+      messageGroup.appendChild(dateDivider);
+      messageGroup.appendChild(messageElement);
+      messageGroup.style.clear = 'both';
+
+      document.getElementById('messages').appendChild(messageGroup);
+    }
+
+    function isSameDay(date1, date2) {
+      return date1.getDate() === date2.getDate() &&
+             date1.getMonth() === date2.getMonth() &&
+             date1.getFullYear() === date2.getFullYear();
+    }
+
+    function formatGroupDate(date) {
+      const currentDate = new Date();
+      const diffTime = Math.abs(currentDate - date);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      if (diffDays < 7) {
+        const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+        return days[date.getDay()];
+      } else {
+        const options = { year: 'numeric', month: 'long', day: 'numeric' };
+        return date.toLocaleDateString('es-ES', options);
+      }
+    }
+
+    function formatDate(dateString) {
+      const date = new Date(dateString);
+      const hours = date.getHours().toString().padStart(2, '0');
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      return `${hours}:${minutes}`;
+    }
+
+    function scrollMessagesToBottom() {
+      const messagesContainer = document.getElementById('messages');
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    document.getElementById('chatForm').addEventListener('submit', function(event) {
+      event.preventDefault();
+      const messageInput = document.getElementById('messageInput');
+      const message = messageInput.value.trim();
+
+      if (message !== '') {
+        socket.emit('chat message', {
+          mensaje: message
+        });
+        messageInput.value = '';
+      }
+    });
+
+    const emojiButton = document.getElementById('emojiButton');
+    const emojiPicker = document.getElementById('emojiPicker');
+    const messageInput = document.getElementById('messageInput');
+
+    // Inicializar Emoji Mart
+    const picker = new EmojiMart.Picker({
+      onSelect: (emoji) => {
+        messageInput.value += emoji.native;
+        emojiPicker.style.display = 'none';
+      },
+      title: 'Selecciona un emoji',
+      emoji: 'point_up',
+    });
+
+    emojiPicker.appendChild(picker);
+
+    emojiButton.addEventListener('click', () => {
+      emojiPicker.style.display = emojiPicker.style.display === 'none' ? 'block' : 'none';
+    });
+  </script>
+</body>
 </html>
+
+
+

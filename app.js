@@ -1,34 +1,67 @@
 const express = require('express');
-const { createServer } = require('node:http');
-const { join } = require('node:path');
+const http = require('http');
+const path = require('path');
 const { Server } = require('socket.io');
+const chatController = require('./src/controllers/chat-controller');
 
 const app = express();
-const server = createServer(app);
+const server = http.createServer(app);
 
 const io = new Server(server);
 
-app.get('/', (req, res) => {
-  res.sendFile(join(__dirname, 'index.html'));
+let users;
+
+app.use(express.static(path.join(__dirname, 'public')));
+
+app.get('/privateChat/:id1/:id2', async (req, res) => {
+  const id1 = req.params.id1;
+  const id2 = req.params.id2;
+  users = [id1, id2];
+
+  try {
+    res.sendFile(path.join(__dirname, 'index.html'));
+  } catch (error) {
+    console.error('Error al verificar el chat:', error);
+    res.status(500).send('Error al verificar el chat');
+  }
 });
 
+io.on('connection', async (socket) => {
+  if (users !== undefined) {
+    await chatController.checkChat(users);
+    socket.userID = users[0];
 
-let nextUserID = 1; // Inicializamos el contador
+    // Enviar el socket.userID al cliente recién conectado
+    socket.emit('user connected', { userID: socket.userID });
 
-io.on('connection', (socket) => {
-  socket.userID = nextUserID++; // Asignamos el ID y luego incrementamos
+    socket.on('chat message', async (data) => {
+      const mensaje = data.mensaje;
 
-  // Enviar el socket.userID al cliente recién conectado
-  socket.emit('user connected', { userID: socket.userID });
-  socket.on('chat message', (data) => {
-    const id = data.userID;
-    const mensaje = data.mensaje;
-    // console.log(id);
+      try {
+        const result = await chatController.createMessage(users, mensaje); // Verifica que result.rows contenga los datos esperados
 
-    io.emit('chat message', { msg: mensaje, userID: id });
-  });
+        // Emitir los campos individualmente
+        io.emit('chat message', result.rows[0].content, result.rows[0].id.toString(), result.rows[0].sender_user, result.rows[0].date_sent, users[0]);
+      } catch (error) {
+        console.error('Error al crear mensaje:', error);
+      }
+    });
+
+    if (!socket.recovered) {
+      try {
+        const results = await chatController.recoverChat(users);
+
+        results.rows.forEach(row => {
+          // Emitir los campos individualmente al cliente
+          socket.emit('chat message', row.content, row.id.toString(), row.sender_user, row.date_sent, users[0]);
+        });
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }
 });
 
 server.listen(3000, () => {
-  console.log('server running at http://localhost:3000');
+  console.log('Server running at http://localhost:3000');
 });
